@@ -9,64 +9,46 @@
 
 namespace via {
 
-/// The Base class for via errors.
 class _VIA_PUBLIC error : public std::logic_error {
 public:
     explicit error(std::string const &what) : std::logic_error(what) {}
 };
 
-class _VIA_PUBLIC socket_set_nonblocking_failed_error : public error {
+class _VIA_PUBLIC socket_pair_creation_failed_error : public error {
 public:
-    explicit socket_set_nonblocking_failed_error()
-            : error("socket set non-blocking failed error") {}
+    explicit socket_pair_creation_failed_error()
+            : error("failed to create socketpair error") {}
 };
 
-class _VIA_PUBLIC ipc_socketpair_creation_failed_error : public error {
+class _VIA_PUBLIC could_not_create_socket_error : public error {
 public:
-    explicit ipc_socketpair_creation_failed_error()
-            : error("IPC socketpair creation failed error") {}
+/// The Base class for via errors.
+    explicit could_not_create_socket_error()
+            : error("master could not create a server_socket error") {}
 };
 
-class _VIA_PUBLIC ipc_recvmsg_failed_error : public error {
+class _VIA_PUBLIC could_not_listen_on_socket_error : public error {
 public:
-    explicit ipc_recvmsg_failed_error()
-            : error("IPC recvmsg failed error") {}
+    explicit could_not_listen_on_socket_error()
+            : error("master could not listen to a server_socket error") {}
 };
 
-class _VIA_PUBLIC ipc_recvmsg_zero_data_error : public error {
+class _VIA_PUBLIC master_could_not_create_socket_error : public error {
 public:
-    explicit ipc_recvmsg_zero_data_error()
-            : error("IPC recvmsg zero data error") {}
+    explicit master_could_not_create_socket_error()
+            : error("master could not create a server_socket error") {}
 };
 
-class _VIA_PUBLIC ipc_recvmsg_not_enough_data_error : public error {
+class _VIA_PUBLIC master_could_not_accept_socket_error : public error {
 public:
-    explicit ipc_recvmsg_not_enough_data_error()
-            : error("IPC recvmsg not enough data error") {}
+    explicit master_could_not_accept_socket_error()
+            : error("master could not accept server_socket error") {}
 };
 
-class _VIA_PUBLIC socket_creation_failed_error : public error {
+class _VIA_PUBLIC server_socket_could_not_bind_socket_error : public error {
 public:
-    explicit socket_creation_failed_error()
-            : error("listen socket creation failed error") {}
-};
-
-class _VIA_PUBLIC socket_reuse_opt_failed_error : public error {
-public:
-    explicit socket_reuse_opt_failed_error()
-            : error("socket reuse option failed error") {}
-};
-
-class _VIA_PUBLIC socket_bind_failed_error : public error {
-public:
-    explicit socket_bind_failed_error()
-            : error("socket bind failed error") {}
-};
-
-class _VIA_PUBLIC socket_listen_failed_error : public error {
-public:
-    explicit socket_listen_failed_error()
-            : error("socket listen failed error") {}
+    explicit server_socket_could_not_bind_socket_error()
+            : error("bind server_socket invalid network address for the specified family error") {}
 };
 
 }

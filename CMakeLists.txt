@@ -8,9 +8,15 @@ set(INCLUDE_DIRS
         src/core/)
 
 set(SRC
-        src/main.cpp
-        src/core/sockets.cpp
-        src/core/sockets.h)
+        src/core/config.h
+        src/core/error.h
+        src/core/procinfo.h
+        src/core/proctype.h
+        src/core/socket_pair.h
+        src/core/socket_type.h
+        src/core/sockets.c
+        src/core/sockets.h
+        src/main.cpp)
 
 add_executable(quick_full_duplex ${SRC})
 

@@ -2,42 +2,45 @@
 // Created by jslater on 17/04/18.
 //
 
-#ifndef VIA_SOCKETS_H
-#define VIA_SOCKETS_H
+#ifndef SOCKETS_H
+#define SOCKETS_H
 
-#include "config.h"
+#include "procinfo.h"
 
-namespace via {
-namespace sockets {
-
-struct channel_t {
-    uint32 command_;
-    pid_t pid_;
-    size_t slot_;
-    fd_handle_t fd_;
-};
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 extern
-void
-set_nonblocking(socket_t socket);
+int
+sck_set_nonblocking(fd_t sfd);
 
 extern
-void
-ipc_prepare(socket_t *sfd);
+int
+sck_create_socketpair(fd_t *sfds);
 
 extern
-void
-ipc_send(socket_t socket, channel_t *channel, size_t size); // send fd by socket
+ssize_t
+sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size);
 
 extern
-void
-ipc_recv(socket_t socket, channel_t *channel, size_t size); // receive fd from socket
+ssize_t
+sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size);
 
 extern
-socket_t
-prepare_listen_socket(uint16 port, int *reuse_addr);
+int
+sck_create_socket(int domain);
 
+extern
+int
+sck_bind_socket(fd_t sfd, sa_family_t af, char const *host, uint16 port, uint16 *port_out);
+
+extern
+int
+sck_listen(fd_t sfd);
+
+#ifdef __cplusplus
 }
-}
+#endif
 
-#endif //VIA_SOCKETS_H
+#endif //SOCKETS_H

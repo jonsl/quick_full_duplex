@@ -14,10 +14,16 @@ public:
     explicit error(std::string const &what) : std::logic_error(what) {}
 };
 
-class _VIA_PUBLIC socket_pair_creation_failed_error : public error {
+class _VIA_PUBLIC process_socket_pair_creation_failed_error : public error {
 public:
-    explicit socket_pair_creation_failed_error()
-            : error("failed to create socketpair error") {}
+    explicit process_socket_pair_creation_failed_error()
+            : error("failed to create socketpair for process error") {}
+};
+
+class _VIA_PUBLIC process_fork_failure_error : public error {
+public:
+    explicit process_fork_failure_error()
+            : error("failed fork process error") {}
 };
 
 class _VIA_PUBLIC could_not_create_socket_error : public error {

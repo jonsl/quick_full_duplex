@@ -73,10 +73,13 @@ typedef double float64;
 /// types
 typedef int fd_t;
 typedef long time_msec_t;
+#ifndef pid_t
 typedef int pid_t;
+#endif
 
 /// constants
 static const fd_t INVALID_FD = -1;
+static const pid_t INVALID_PID = -1;
 static const time_msec_t INVALID_TIME_MSEC = -1;
 static const int MAX_PROCESSESS = 1024;
 #ifdef _LEVEL1_DCACHE_LINESIZE

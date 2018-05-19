@@ -11,12 +11,11 @@ namespace via {
 
 enum class socket_type : uint32 {
 
-    NULL_SOCKET = 0,
+    NULL_SOCKET_TYPE = 0,
 
-    CLIENT_SOCKET,
+    CLIENT,
 
-    SERVER_SOCKET
-
+    SERVER
 };
 
 }

@@ -12,10 +12,11 @@ set(SRC
         src/core/error.h
         src/core/procinfo.h
         src/core/proctype.h
-        src/core/socket_pair.h
+        src/core/process.h
         src/core/socket_type.h
         src/core/sockets.c
         src/core/sockets.h
+        src/core/worker.h
         src/main.cpp)
 
 add_executable(quick_full_duplex ${SRC})

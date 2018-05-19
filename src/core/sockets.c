@@ -56,37 +56,41 @@ ssize_t
 sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size) {
 
     static const int NUM_FD = 1;
+    fd_t fds[NUM_FD];
+    bzero(fds, sizeof(fds));
 
-    int fds[NUM_FD];  /* Contains the file descriptors to pass */
-
-    struct iovec iov = {
-            .iov_base = procinfo,
-            .iov_len = size
-    };
-
+    struct iovec iov[1];
+    iov[0].iov_base = procinfo;
+    iov[0].iov_len = size;
     union {         /* Ancillary data buffer, wrapped in a union
                               in order to ensure it is suitably aligned */
-        struct cmsghdr cmsghdr_;
         char buf_[CMSG_SPACE(sizeof(fds))];
-
-    } cmsg;
-    bzero(&cmsg, sizeof(cmsg));
-
-    cmsg.cmsghdr_.cmsg_level = SOL_SOCKET;
-    cmsg.cmsghdr_.cmsg_type = SCM_RIGHTS;
-    cmsg.cmsghdr_.cmsg_len = CMSG_LEN(sizeof(fds));
-    memcpy(CMSG_DATA(&cmsg.cmsghdr_), fds, sizeof(fds));
+        struct cmsghdr cmsghdr_;
+    } u;
 
     struct msghdr msg;
-    msg.msg_iov = &iov;
+    bzero(&msg, sizeof(msg));
+    msg.msg_iov = iov;
     msg.msg_iovlen = 1;
-    msg.msg_control = &cmsg.cmsghdr_;
-    msg.msg_controllen = sizeof(cmsg);
+    msg.msg_control = u.buf_;
+    msg.msg_controllen = sizeof(u.buf_);
+
+    struct cmsghdr *cmsg;
+    cmsg = CMSG_FIRSTHDR(&msg);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int) * NUM_FD);
+    fd_t *fdptr = (fd_t *) CMSG_DATA(cmsg);    /* Initialize the payload */
+    bcopy(fds, fdptr, NUM_FD * sizeof(fd_t));
 
     ssize_t r;
 
     r = sendmsg(sfd, &msg, 0);
-    if (r < 0) {
+
+    if (r == -1) {
+        if (errno == EAGAIN) {
+            return errno;
+        }
         fprintf(stderr, "sck_ipc_send sendmsg error: %s\n", strerror(errno));
         return r;
     }
@@ -100,50 +104,55 @@ ssize_t
 sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size) { // receive fd from server_socket
 
     static const int NUM_FD = 1;
+    fd_t fds[NUM_FD];
+    bzero(fds, sizeof(fds));
 
-    fd_t fds[NUM_FD];  /* Contains the file descriptors to pass */
-
-    struct iovec iov = {
-            .iov_base = procinfo,
-            .iov_len = size
-    };
+    struct iovec iov[1];
+    iov[0].iov_base = procinfo;
+    iov[0].iov_len = size;
     union {         /* Ancillary data buffer, wrapped in a union
                               in order to ensure it is suitably aligned */
-        struct cmsghdr cmsghdr_;
         char buf_[CMSG_SPACE(sizeof(fds))];
+        struct cmsghdr cmsghdr_;
+    } u;
 
-    } cmsg;
-    bzero(&cmsg, sizeof(cmsg));
+    memset(u.buf_, 0x0d, sizeof(u.buf_));
+    struct cmsghdr *cmsghdr;
+    cmsghdr = (struct cmsghdr *) u.buf_;
+    cmsghdr->cmsg_len = CMSG_LEN(sizeof(fds));
+    cmsghdr->cmsg_level = SOL_SOCKET;
+    cmsghdr->cmsg_type = SCM_RIGHTS;
 
     struct msghdr msg;
-    msg.msg_iov = &iov;
-    msg.msg_iovlen = 1;
-    msg.msg_control = &cmsg.cmsghdr_;
-    msg.msg_controllen = sizeof(cmsg);
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
+    msg.msg_control = cmsghdr;
+    msg.msg_controllen = CMSG_LEN(sizeof(fds));
+    msg.msg_flags = 0;
 
     ssize_t r;
 
     r = recvmsg(sfd, &msg, 0);
-    if (r < 0) {
-        fprintf(stderr, "sck_ipc_recv recvmsg (r < 0) error: %s\n", strerror(errno));
-        return r;
-    }
 
-    if (r == 0) {
-        fprintf(stderr, "sck_ipc_recv recvmsg (r == 0) error: %s\n", strerror(errno));
+    if (r == -1) {
+        if (errno == EAGAIN) {
+            return errno;
+        }
+        fprintf(stderr, "sck_ipc_recv recvmsg (r == -1) error: %s\n", strerror(errno));
         return r;
     }
 
     if (r < size) {
-        fprintf(stderr, "sck_ipc_recv recvmsg (r < size) error: %s\n", strerror(errno));
-        return r;
+        fprintf(stderr, "sck_ipc_recv recvmsg (r < size) error: %ld\n", size);
+        return -1;
     }
 
-    memcpy(&fds[0], CMSG_DATA(&cmsg.cmsghdr_), sizeof(fds));
-
+    fd_t *p = (int *) CMSG_DATA(cmsghdr);
     fprintf(stdout, "sck_ipc_recv recvmsg, fds: %i\n", fds[0]);
 
-    return 0;
+    return r;
 }
 
 fd_t

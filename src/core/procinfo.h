@@ -10,9 +10,7 @@
 
 struct procinfo_t {
     uint32 command_;
-    pid_t pid_;
-    size_t slot_;
-    int fd_;
+    pid_t owner_;
     enum proctype_t type_;
 };
 

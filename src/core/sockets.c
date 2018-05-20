@@ -8,6 +8,9 @@
 #include <assert.h>
 #include "sockets.h"
 
+/// set a socket as non-blocking
+/// \param sfd
+/// \return < 0 on error
 int
 sck_set_nonblocking(fd_t sfd) {
 
@@ -16,7 +19,7 @@ sck_set_nonblocking(fd_t sfd) {
     r = fcntl(sfd, F_GETFL);
     if (r < 0) {
         fprintf(stderr, "sck_set_nonblocking F_GETFL error: %s\n", strerror(errno));
-        return r;
+        return r;   // can return
     }
 
     r = fcntl(sfd, F_SETFL, r | O_NONBLOCK);
@@ -28,6 +31,9 @@ sck_set_nonblocking(fd_t sfd) {
     return r;
 }
 
+/// create a socket pair for ipc
+/// \param sfds sockect pair out
+/// \return < 0 on error
 int
 sck_create_socketpair(fd_t sfds[2]) {
 
@@ -52,36 +58,54 @@ sck_create_socketpair(fd_t sfds[2]) {
     return r;
 }
 
+/// send file descriptor set from a process
+/// \param sfd
+/// \param procinfo
+/// \param size
+/// \param fds
+/// \param nfds
+/// \return number of characters sent or -1 on error
 ssize_t
 sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t *fds, size_t nfds) {
 
-    assert(procinfo);
+    assert(procinfo && sizeof(struct procinfo_t) % size == 0);
 
     struct iovec iov[1];
     iov[0].iov_base = procinfo;
     iov[0].iov_len = size;
-    union {         /* Ancillary data buffer, wrapped in a union
-                              in order to ensure it is suitably aligned */
-        char buf_[CMSG_SPACE(sizeof(fd_t) * nfds)];
-        struct cmsghdr cmsghdr_;
-    } u;
 
     struct msghdr msg;
+
     msg.msg_name = NULL;
     msg.msg_namelen = 0;
     msg.msg_iov = iov;
     msg.msg_iovlen = 1;
-    msg.msg_control = u.buf_;
-    msg.msg_controllen = sizeof(u.buf_);
     msg.msg_flags = 0;
 
-    struct cmsghdr *cmsg;
-    cmsg = CMSG_FIRSTHDR(&msg);
-    cmsg->cmsg_level = SOL_SOCKET;
-    cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(sizeof(fd_t) * nfds);
-    fd_t *fdptr = (fd_t *) CMSG_DATA(cmsg);    /* Initialize the payload */
-    bcopy(fds, fdptr, sizeof(fd_t) * nfds);
+    if (fds) {
+
+        union { // ancillary data buffer, wrapped in a union in order to ensure it is suitably aligned
+            char buf_[CMSG_SPACE(sizeof(fd_t) * nfds)];
+            struct cmsghdr cmsghdr_;
+        } u;
+
+        msg.msg_control = u.buf_;
+        msg.msg_controllen = sizeof(u.buf_);
+
+        struct cmsghdr *cmsg;
+        cmsg = CMSG_FIRSTHDR(&msg);
+        cmsg->cmsg_level = SOL_SOCKET;
+        cmsg->cmsg_type = SCM_RIGHTS;
+        cmsg->cmsg_len = CMSG_LEN(sizeof(fd_t) * nfds);
+        fd_t *fdptr = (fd_t *) CMSG_DATA(cmsg); // initialize the payload
+        bcopy(fds, fdptr, sizeof(fd_t) * nfds);
+
+    } else {
+
+        msg.msg_control = NULL;
+        msg.msg_controllen = 0;
+
+    }
 
     ssize_t r;
 
@@ -98,41 +122,52 @@ sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t *fds, size
     return r;
 }
 
-/// receive fd from server_socket
+/// receive file descriptor set from a process
 /// \param sfd
 /// \param procinfo
 /// \param size
 /// \param fds
 /// \param nfds
-/// \return
+/// \return number of bytes received or -1 on error
 ssize_t
 sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t *fds, size_t nfds) {
 
-    assert(procinfo);
+    assert(procinfo && sizeof(struct procinfo_t) % size == 0);
 
     struct iovec iov[1];
     iov[0].iov_base = procinfo;
     iov[0].iov_len = size;
-    union {         /* Ancillary data buffer, wrapped in a union
-                              in order to ensure it is suitably aligned */
-        char buf_[CMSG_SPACE(sizeof(fd_t) * nfds)];
-        struct cmsghdr cmsghdr_;
-    } u;
-
-    struct cmsghdr *cmsghdr;
-    cmsghdr = (struct cmsghdr *) u.buf_;
-    cmsghdr->cmsg_len = CMSG_LEN(sizeof(fd_t) * nfds);
-    cmsghdr->cmsg_level = SOL_SOCKET;
-    cmsghdr->cmsg_type = SCM_RIGHTS;
 
     struct msghdr msg;
+    struct cmsghdr *cmsghdr = NULL;
+
     msg.msg_name = NULL;
     msg.msg_namelen = 0;
     msg.msg_iov = iov;
     msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
-    msg.msg_control = u.buf_;
-    msg.msg_controllen = sizeof(u.buf_);
     msg.msg_flags = 0;
+
+    if (fds) {
+
+        union { // ancillary data buffer, wrapped in a union in order to ensure it is suitably aligned
+            char buf_[CMSG_SPACE(sizeof(fd_t) * nfds)];
+            struct cmsghdr cmsghdr_;
+        } u;
+
+        msg.msg_control = u.buf_;
+        msg.msg_controllen = sizeof(u.buf_);
+
+        cmsghdr = (struct cmsghdr *) u.buf_;
+        cmsghdr->cmsg_len = CMSG_LEN(sizeof(fd_t) * nfds);
+        cmsghdr->cmsg_level = SOL_SOCKET;
+        cmsghdr->cmsg_type = SCM_RIGHTS;
+
+    } else {
+
+        msg.msg_control = NULL;
+        msg.msg_controllen = 0;
+
+    }
 
     ssize_t r;
 
@@ -151,12 +186,17 @@ sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t *fds, size
         return -1;
     }
 
-    fd_t *p = (fd_t *) CMSG_DATA(cmsghdr);
-    bcopy(p, fds, sizeof(fd_t) * nfds);
+    if (fds) {
+        fd_t *p = (fd_t *) CMSG_DATA(cmsghdr);
+        bcopy(p, fds, sizeof(fd_t) * nfds); // retrieve the payload
+    }
 
     return r;
 }
 
+/// create domain socket
+/// \param domain must be AF_INET or AF_INET6
+/// \return socket file descriptor or -1 on error
 fd_t
 sck_create_socket(int domain) {
     assert(domain == AF_INET || domain == AF_INET6);
@@ -181,7 +221,7 @@ sck_create_socket(int domain) {
 /// \param host address of host or nullptr to bind socket to any process
 /// \param port desired port or 0 for os to assign a port
 /// \param port_out set to port actually used
-/// \return < 0 for error or 0 for success
+/// \return 0 on success, -1 on error
 int
 sck_bind_socket(fd_t sfd, sa_family_t af, char const *host, uint16 port, uint16 *port_out) {
 
@@ -241,6 +281,9 @@ sck_bind_socket(fd_t sfd, sa_family_t af, char const *host, uint16 port, uint16 
     return r;
 }
 
+/// mark a socket as passive
+/// \param sfd socket file descriptor
+/// \return 0 on success, -1 on error
 int
 sck_listen(fd_t sfd) {
 

@@ -48,7 +48,8 @@ public:
             // in parent process
             ::close(sv_[CHILD_SOCKET_INDEX]);
 
-            std::cout << "parent: (parent, this) =  (" << parent_pid_ << ", " << this_pid_ << ")" << std::endl;
+            std::cout << "parent: (parent, this) =  (" << parent_pid_ << ", " << this_pid_ << ")" << std::endl
+                      << std::flush;
 
             run_parent();
 
@@ -58,7 +59,8 @@ public:
 
             parent_pid_ = this_pid_;
             this_pid_ = getpid();
-            std::cout << "child: (parent, this) =  (" << parent_pid_ << ", " << this_pid_ << ")" << std::endl;
+            std::cout << "child: (parent, this) =  (" << parent_pid_ << ", " << this_pid_ << ")" << std::endl
+                      << std::flush;
 
             run_child();
         }
@@ -71,11 +73,6 @@ public:
 
     void run_child() {
 
-        static constexpr size_t RECV_BUFF_SIZE = 1024;
-        std::vector<char> buf(RECV_BUFF_SIZE);
-
-        ssize_t r;
-
         for (;;) {
 
             procinfo_t procinfo{};
@@ -83,22 +80,26 @@ public:
             static constexpr size_t NUM_FDS = 2;
             fd_t fds[NUM_FDS];
 
+            ssize_t r;
+
             r = sck_ipc_recv(sv_[CHILD_SOCKET_INDEX], &procinfo, sizeof(procinfo), fds, NUM_FDS);
 
             if (r == sizeof(procinfo)) {
 
-                // ok
+                // received whole procinfo
+                std::cout << "child " << r << " bytes received ok" << std::endl;
 
-                std::cout << "run_child received ok: procinfo={" << procinfo.command_ << ", " << procinfo.pid_ << ", "
-                          << procinfo.slot_ << ", " << procinfo.fd_ << ", " << procinfo.type_ << "}" << std::endl;
+                std::cout << "\t=> procinfo = {" << procinfo.command_ << ","
+                          << procinfo.owner_ << "," << procinfo.type_ << "}" << std::endl;
 
                 for (fd_t fd : fds) {
-                    fprintf(stdout, "run_child received fd: %i:\n", fd);
+                    fprintf(stdout, "child fd: %i contents:\n", fd);
                     write_fd(fd);
                 }
                 std::cout << std::endl;
 
             } else {
+
 
             }
 
@@ -113,19 +114,12 @@ public:
 
     void run_parent() {
 
-        static constexpr size_t RECV_BUFF_SIZE = 1024;
-        std::vector<char> buf(RECV_BUFF_SIZE);
-
-        ssize_t r;
-
         for (;;) {
 
             procinfo_t procinfo{};
             std::cout << "\ncommand: ";
             std::cin >> procinfo.command_;
-            procinfo.pid_ = this_pid_;
-            procinfo.slot_ = 0;
-            procinfo.fd_ = -1;
+            procinfo.owner_ = this_pid_;
             procinfo.type_ = MASTER_PROCTYPE;
 
             static constexpr size_t NUM_FDS = 2;
@@ -142,13 +136,14 @@ public:
 
             std::cout << "parent sending: fd_1: " << fd_1 << ", fd_2: " << fd_2 << std::endl;
 
+            ssize_t r;
 
             r = sck_ipc_send(sv_[PARENT_SOCKET_INDEX], &procinfo, sizeof(procinfo), fds, NUM_FDS);
 
             if (r == sizeof(procinfo)) {
 
                 // ok
-                std::cout << "parent sent ok, r: " << r << std::endl;
+                std::cout << "parent " << r << " bytes sent ok" << std::endl;
 
             } else {
 

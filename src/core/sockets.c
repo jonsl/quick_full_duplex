@@ -53,35 +53,35 @@ sck_create_socketpair(fd_t sfds[2]) {
 }
 
 ssize_t
-sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size) {
+sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t *fds, size_t nfds) {
 
-    static const int NUM_FD = 1;
-    fd_t fds[NUM_FD];
-    bzero(fds, sizeof(fds));
+    assert(procinfo);
 
     struct iovec iov[1];
     iov[0].iov_base = procinfo;
     iov[0].iov_len = size;
     union {         /* Ancillary data buffer, wrapped in a union
                               in order to ensure it is suitably aligned */
-        char buf_[CMSG_SPACE(sizeof(fds))];
+        char buf_[CMSG_SPACE(sizeof(fd_t) * nfds)];
         struct cmsghdr cmsghdr_;
     } u;
 
     struct msghdr msg;
-    bzero(&msg, sizeof(msg));
+    msg.msg_name = NULL;
+    msg.msg_namelen = 0;
     msg.msg_iov = iov;
     msg.msg_iovlen = 1;
     msg.msg_control = u.buf_;
     msg.msg_controllen = sizeof(u.buf_);
+    msg.msg_flags = 0;
 
     struct cmsghdr *cmsg;
     cmsg = CMSG_FIRSTHDR(&msg);
     cmsg->cmsg_level = SOL_SOCKET;
     cmsg->cmsg_type = SCM_RIGHTS;
-    cmsg->cmsg_len = CMSG_LEN(sizeof(int) * NUM_FD);
+    cmsg->cmsg_len = CMSG_LEN(sizeof(fd_t) * nfds);
     fd_t *fdptr = (fd_t *) CMSG_DATA(cmsg);    /* Initialize the payload */
-    bcopy(fds, fdptr, NUM_FD * sizeof(fd_t));
+    bcopy(fds, fdptr, sizeof(fd_t) * nfds);
 
     ssize_t r;
 
@@ -95,31 +95,33 @@ sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size) {
         return r;
     }
 
-    fprintf(stdout, "sck_ipc_send sendmsg, fds: %i\n", fds[0]);
-
     return r;
 }
 
+/// receive fd from server_socket
+/// \param sfd
+/// \param procinfo
+/// \param size
+/// \param fds
+/// \param nfds
+/// \return
 ssize_t
-sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size) { // receive fd from server_socket
+sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t *fds, size_t nfds) {
 
-    static const int NUM_FD = 1;
-    fd_t fds[NUM_FD];
-    bzero(fds, sizeof(fds));
+    assert(procinfo);
 
     struct iovec iov[1];
     iov[0].iov_base = procinfo;
     iov[0].iov_len = size;
     union {         /* Ancillary data buffer, wrapped in a union
                               in order to ensure it is suitably aligned */
-        char buf_[CMSG_SPACE(sizeof(fds))];
+        char buf_[CMSG_SPACE(sizeof(fd_t) * nfds)];
         struct cmsghdr cmsghdr_;
     } u;
 
-    memset(u.buf_, 0x0d, sizeof(u.buf_));
     struct cmsghdr *cmsghdr;
     cmsghdr = (struct cmsghdr *) u.buf_;
-    cmsghdr->cmsg_len = CMSG_LEN(sizeof(fds));
+    cmsghdr->cmsg_len = CMSG_LEN(sizeof(fd_t) * nfds);
     cmsghdr->cmsg_level = SOL_SOCKET;
     cmsghdr->cmsg_type = SCM_RIGHTS;
 
@@ -128,8 +130,8 @@ sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size) { // receive fd
     msg.msg_namelen = 0;
     msg.msg_iov = iov;
     msg.msg_iovlen = sizeof(iov) / sizeof(iov[0]);
-    msg.msg_control = cmsghdr;
-    msg.msg_controllen = CMSG_LEN(sizeof(fds));
+    msg.msg_control = u.buf_;
+    msg.msg_controllen = sizeof(u.buf_);
     msg.msg_flags = 0;
 
     ssize_t r;
@@ -149,8 +151,8 @@ sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size) { // receive fd
         return -1;
     }
 
-    fd_t *p = (int *) CMSG_DATA(cmsghdr);
-    fprintf(stdout, "sck_ipc_recv recvmsg, fds: %i\n", fds[0]);
+    fd_t *p = (fd_t *) CMSG_DATA(cmsghdr);
+    bcopy(p, fds, sizeof(fd_t) * nfds);
 
     return r;
 }

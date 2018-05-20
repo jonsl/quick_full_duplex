@@ -16,7 +16,6 @@ set(SRC
         src/core/socket_type.h
         src/core/sockets.c
         src/core/sockets.h
-        src/core/worker.h
         src/main.cpp)
 
 add_executable(quick_full_duplex ${SRC})

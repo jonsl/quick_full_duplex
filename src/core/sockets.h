@@ -21,11 +21,11 @@ sck_create_socketpair(fd_t *sfds);
 
 extern
 ssize_t
-sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size);
+sck_ipc_send(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t* fds, size_t nfds);
 
 extern
 ssize_t
-sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size);
+sck_ipc_recv(fd_t sfd, struct procinfo_t *procinfo, size_t size, fd_t *fds, size_t nfds);
 
 extern
 int

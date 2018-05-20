@@ -15,7 +15,7 @@ class process {
 public:
 
     enum socket_index {
-        NULL_SOCKET_INDEX = -1, CHILD_SOCKET_INDEX = 0, PARENT_SOCKET_INDEX = 1
+        CHILD_SOCKET_INDEX = 0, PARENT_SOCKET_INDEX = 1
     };
 
     explicit
@@ -87,14 +87,14 @@ public:
             if (r == sizeof(procinfo)) {
 
                 // received whole procinfo
-                std::cout << "child " << r << " bytes received ok" << std::endl;
-
-                std::cout << "\t=> procinfo = {" << procinfo.command_ << ","
-                          << procinfo.owner_ << "," << procinfo.type_ << "}" << std::endl;
+                std::cout << "child " << r << " bytes received ok => procinfo = {"
+                          << procinfo.command_ << "," << procinfo.owner_ << "," << procinfo.type_ << "}" << std::endl;
 
                 for (fd_t fd : fds) {
                     fprintf(stdout, "child fd: %i contents:\n", fd);
                     write_fd(fd);
+
+                    ::close(fd);
                 }
                 std::cout << std::endl;
 
@@ -140,6 +140,9 @@ public:
 
             r = sck_ipc_send(sv_[PARENT_SOCKET_INDEX], &procinfo, sizeof(procinfo), fds, NUM_FDS);
 
+            ::close(fd_2);
+            ::close(fd_1);
+
             if (r == sizeof(procinfo)) {
 
                 // ok
@@ -148,9 +151,7 @@ public:
             } else {
 
             }
-
         }
-
     }
 
 #pragma clang diagnostic pop
@@ -169,6 +170,7 @@ private:
         }
     }
 
+private:
 
     std::string name_;
 
